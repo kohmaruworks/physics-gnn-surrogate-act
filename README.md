@@ -6,39 +6,55 @@
 
 [🇺🇸 English](#english) | [🇯🇵 日本語](#japanese)
 
----
-
 <a id="english"></a>
 
 ## English
 
-### Title & overview
+### Title & Overview
 
-**ACT–GNN Phase 2** is a research-grade, minimal but sharp codebase that studies **physics-informed graph surrogates** under two complementary pressures that appear in deep-tech R&D: **variable problem scale** (mesh / graph cardinality) and **multiphysics compositionality** (distinct interaction laws on the same substrate).
-
-Building on a Phase‑1 narrative (structure-blind models vs graph structure), Phase 2 foregrounds the **categorical reading of heterogeneous graphs**: typed interactions (e.g., spring-like vs damper-like channels) are not merely “different edge attributes” but **first-class morphisms** that should be **separated at the schema level** and then instantiated in **PyTorch Geometric** as `HeteroData` + `HeteroConv`.
+**ACT–GNN Phase 2** extends the Phase‑1 line of work: it stress-tests **physics-informed graph surrogates** where (i) **graph cardinality** changes across deployment (scale), and (ii) **multiple constitutive laws** share the same discrete substrate (multiphysics). The central design choice is to treat heterogeneous interactions as **schema-level structure**—materialized in PyTorch Geometric as `HeteroData` with `HeteroConv`—rather than as a single mixed edge set with opaque attributes.
 
 | Layer | Role in this repository |
 | --- | --- |
-| **Julia / ACT** | `Catlab.jl` + `Catlab.Graphs` for principled graph construction and a sanity check of the categorical tooling chain (`test_catlab.jl`). `Project.toml` also pins **DifferentialEquations.jl** and **JSON3.jl** for dynamics-oriented extensions and data interchange—aligned with a Julia-first modeling → Python-first training split. |
-| **Python / PyG** | Surrogate experiments: **scale-stability** of message passing vs fixed-geometry MLPs (`demo1_scale_generalization.py`), and **multiphysics** spring–damper chains with homogeneous vs hetero GCNs (`demo2_category_multiphysics.py`). |
+| **Julia / ACT** | `Catlab.jl` and `Catlab.Graphs` for a minimal, auditable **categorical tooling spine** (`test_catlab.jl`). `Project.toml` pins **DifferentialEquations.jl** and **JSON3.jl** for dynamics-heavy extensions and structured interchange toward Python. |
+| **Python / PyG** | Executable tracks: **scale** (`demo1_scale_generalization.py`: message passing vs fixed-layout MLP), **multiphysics** (`demo2_category_multiphysics.py`: spring vs damper channels, homogeneous vs hetero GCN), optional **JSON-grounded** benchmark (`compare_loss_visualization.py`), and **device smoke test** (`test_gpu.py`). |
 
-**Physics focus (implemented).** Node states are **2D** \([u, v]\): position and velocity along a 1D chain. **Springs** contribute forces proportional to **displacement** \((u_j - u_i)\); **dampers** contribute forces proportional to **velocity difference** \((v_j - v_i)\). One-step **semi-implicit Euler** targets provide a clean, differentiable supervised signal for surrogate learning.
+**Implemented physics.** Each node carries a 2D state \([u, v]\) (scalar position and velocity along a 1D chain). **Springs** apply Hooke forces \(\propto (u_j - u_i)\); **dampers** apply forces \(\propto (v_j - v_i)\) where applicable. Supervision is a **single explicit Euler-type step** \(v' = v + (F/m)\,\Delta t\), \(u' = u + v\,\Delta t\) with forces assembled from the active topology (see source for exact update order per script).
 
-**Tech stack (from source & manifests).** Julia: `Catlab`, `DifferentialEquations`, `JSON3`. Python: `torch`, `torch_geometric`, `matplotlib`. Optional: CUDA for larger workloads (`test_gpu.py`).
+**Indexing contract (Julia ↔ PyG).** Julia’s graph APIs conventionally use **1-based** vertex labels; PyTorch Geometric expects **0-based** node indices in `edge_index`. For any **Catlab → JSON → Python** path, perform the **1-based → 0-based conversion exactly once** at the export/ingest boundary so downstream training sees one canonical integer labeling—this avoids silent off-by-one bugs when mixing languages.
+
+| Track | Script | What it fixes / proves |
+| --- | --- | --- |
+| **Scale** | `demo1_scale_generalization.py` | A flattened **NaiveMLP** is tied to a fixed \(N\); at inference with \(N=50\) after being sized for \(N=10\) it raises **`RuntimeError`** (shape mismatch). A small **GCN** stack accepts variable `edge_index` and completes forward on the larger chain (**no training** in this demo; `torch.manual_seed(0)`). |
+| **Multiphysics** | `demo2_category_multiphysics.py` | Alternating **spring** and **damper** bonds on an even-length chain; **HomogeneousGNN** mixes both relation types in one `edge_index`; **CategoryHeteroGNN** routes springs and dampers through **separate** `GCNConv` towers inside `HeteroConv`. Writes **`hetero_loss_comparison.png`**. |
+| **Optional JSON benchmark** | `compare_loss_visualization.py` | Spring-only targets on a **fixed** graph loaded from **`graph_from_catlab.json`**; **150 / 50** train–test split over **200** synthetic states; logs **test** MSE each epoch to **`loss_comparison_test.png`**. Requires a PyG JSON loader (e.g. `import_catlab_json_to_pyg`) not shipped in this revision. |
+
+**Default hyperparameters (as in source).**
+
+| Setting | `demo1_scale_generalization.py` | `demo2_category_multiphysics.py` | `compare_loss_visualization.py` (when runnable) |
+| --- | --- | --- | --- |
+| Design \(N\) / nodes | Train layout \(N_{\mathrm{design}}=10\); inference \(N=50\) | `num_nodes = 12` (even; chain topology) | `num_nodes = int(Data.num_nodes)` from JSON |
+| Features / hidden | `feat_dim = 2`, GNN `hidden = 32` | `feat_dim = 2`, `hidden = 64` | `feat_dim = 2`, **both** GNN & MLP `hidden = 96` |
+| Optimizer / epochs | *(none — forward only)* | `Adam`, `lr = 1e-3`, `epochs = 200` | `Adam`, `lr = 1e-3`, `epochs = 800` |
+| Physics constants | — | `k = 1.0`, `c = 0.8`, `m = 1.0`, `dt = 0.05` | `k = 1.0`, `m = 1.0`, `dt = 0.05` (spring-only target) |
+| Data randomness | `torch.randn` for \(x_{50}\) | Initial state pool: `pool_size = 64`; `torch.manual_seed(7)`, generator seed `12345`; `pos_scale = 1.0`, `vel_scale = 0.6` | `torch.manual_seed(42)`; dataset generator `42`; `pos_scale = 1.0`, `vel_scale = 0.5`; **200** samples, **150 train / 50 test** |
+| PyG topology | Directed chain edges \((i,i{+}1)\) | Springs: pairs \((0,1),(2,3),\ldots\); dampers: \((1,2),(3,4),\ldots\); each logical bond expanded **bidirectionally** for `edge_index` | `spring_pairs` from `edge_index` by **deduplicating** opposite directed arcs (one spring per undirected pair) |
+
+**Implementation note (`compare_loss_visualization.py`).** The supervised map \(x \mapsto y\) induced by one linearized spring-mass step is **linear in \(x\)**; a wide flattened MLP can approximate arbitrary linear maps, while a weight-sharing GCN induces a **different function class**—so test curves are **not** claimed to be a “fair capacity match,” only a controlled comparison under shared hidden width and optimizer defaults (see file header comments).
 
 ### Architecture
 
-The repository is organized as a **two-language research pipeline** that mirrors how many labs operate: **declarative physics / combinatorics in Julia**, **differentiable learning in Python**.
+| Stage | Location | Responsibility |
+| --- | --- | --- |
+| 1. Categorical incidence | Julia (`test_catlab.jl`, future ACSets) | Declare vertices as **objects** and edges as **typed generating morphisms** before any training. |
+| 2. Schema → tensors | Python (`demo2_*`, optional JSON loader) | Materialize relation types as **disjoint** `edge_index` blocks (`HeteroData`) or a deliberately mixed baseline (`Data`). |
+| 3. Learning & plots | Python (PyG + `matplotlib`) | Fit surrogates against physics-generated one-step targets; export loss curves / PNGs. |
 
-1. **Categorical modeling (Julia).**  
-   `test_catlab.jl` constructs a small graph in `Catlab.Graphs`, treating vertices as **objects** and edges as **generating morphisms** of an incidence structure. This is the lightweight “ACT spine” of the repo: it validates the Julia stack and documents the intent that **larger ACSets / C-sets** can prescribe typed wires (mass, spring, damper, …) before export.
+Process detail:
 
-2. **Schema materialization → deep learning (Python).**  
-   `demo2_category_multiphysics.py` **instantiates** that idea without JSON: spring and damper adjacencies are built as disjoint relation types, assembled into `HeteroData`, and processed with **parallel `GCNConv` stacks** inside `HeteroConv` so spring and damper channels **do not share parameters**—a direct analogue of “different hom-sets” in a categorical presentation.
-
-3. **Optional round-trip (JSON bridge).**  
-   `compare_loss_visualization.py` is written for a **Catlab-exported** topology (`graph_from_catlab.json`) and a small PyG loader module. Generated `*.json` graphs are **gitignored** by design; the loader is not shipped in the current tree revision. Treat this script as an **optional extension** if you restore or supply those assets—conceptually it closes the loop: **Julia incidence → JSON → `torch_geometric.data.Data` → trained surrogate**.
+1. **Julia** instantiates the dependency stack (`Catlab`, optional `DifferentialEquations`, `JSON3`) and can emit **structured** graph data; **JSON artifacts are gitignored** (see `.gitignore`) so exports stay reproducible but out of version control unless you vendor them.
+2. **Python** either **constructs** the hetero schema directly (`demo2_category_multiphysics.py`) or **ingests** exported topology (`compare_loss_visualization.py` path) with the **0-based** indexing contract above.
+3. **Baselines** are always co-located: homogeneous vs hetero in multiphysics; GNN vs MLP in optional JSON track; MLP failure mode in scale demo.
 
 ```mermaid
 flowchart LR
@@ -60,21 +76,21 @@ flowchart LR
   H --> T
 ```
 
-### File structure
+### File Structure
 
-| Path | Description |
+| Path | Role |
 | --- | --- |
-| `Project.toml` / `Manifest.toml` | Julia dependencies: **Catlab**, **DifferentialEquations**, **JSON3**. |
-| `test_catlab.jl` | Minimal Catlab graph smoke test; entry point for the Julia side. |
-| `demo1_scale_generalization.py` | **Phase‑2 scale track:** random-init GNN vs MLP on \(N=10\) vs \(N=50\) chain; MLP fails by construction. |
-| `demo2_category_multiphysics.py` | **Phase‑2 multiphysics track:** spring/damper multiplexed chain; trains **homogeneous** vs **category-hetero** GCN; writes `hetero_loss_comparison.png`. |
-| `compare_loss_visualization.py` | **Optional:** GNN vs MLP test-loss curves on a fixed graph; expects `graph_from_catlab.json` + a PyG JSON loader (not included here). |
-| `test_gpu.py` | Quick CUDA / `torch.matmul` sanity check. |
-| `.gitignore` | Ignores virtualenvs and `*.json` export artifacts. |
+| `Project.toml` / `Manifest.toml` | Julia environment: **Catlab**, **DifferentialEquations**, **JSON3**. |
+| `test_catlab.jl` | Loads `Catlab` / `Catlab.Graphs`, builds a tiny graph, prints incidence counts. |
+| `demo1_scale_generalization.py` | Scale track: `CategoryInformedGNN` vs `NaiveMLP`, variable \(N\), no optimization loop. |
+| `demo2_category_multiphysics.py` | Multiphysics track: `HomogeneousGNN` vs `CategoryHeteroGNN`, training loop, `hetero_loss_comparison.png`. |
+| `compare_loss_visualization.py` | Optional JSON track: GNN vs MLP, test-only loss trace, `loss_comparison_test.png`. |
+| `test_gpu.py` | CUDA availability and large `matmul` timing. |
+| `.gitignore` | Virtualenvs, caches, and **`*.json`** export data. |
 
-### Quick start & usage
+### Quick Start
 
-**Julia (categorical layer)**
+**Julia**
 
 ```bash
 cd /path/to/physics-gnn-surrogate-act
@@ -82,7 +98,7 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 julia --project=. test_catlab.jl
 ```
 
-**Python (learning layer)**
+**Python**
 
 ```bash
 python -m venv .venv
@@ -94,19 +110,11 @@ python demo2_category_multiphysics.py
 python test_gpu.py
 ```
 
-**Optional:** after you place `graph_from_catlab.json` and a compatible `import_catlab_json_to_pyg` (or adapt the import), run:
+**Optional (JSON track):** place `graph_from_catlab.json` plus a compatible `import_catlab_json_to_pyg` (or adjust the import) in the repo root, then:
 
 ```bash
 python compare_loss_visualization.py
 ```
-
-Outputs: `hetero_loss_comparison.png` (demo 2), `loss_comparison_test.png` (optional script, when dependencies are satisfied).
-
-### Positioning for inbound partners
-
-Phase 2 is deliberately **small, auditable, and opinionated**: it is meant as a **portfolio-grade** artifact for R&D engineers and academic collaborators who care about **why** heterogeneous graph learning matters in multiphysics surrogates, and how **ACT-flavored modeling** in Julia can sit upstream of **PyG** training—without hiding the engineering details (indexing, typed edges, baseline comparisons).
-
----
 
 <a id="japanese"></a>
 
@@ -114,31 +122,49 @@ Phase 2 is deliberately **small, auditable, and opinionated**: it is meant as a 
 
 ### タイトルと概要
 
-**ACT–GNN Phase 2** は、ディープテック企業や研究機関の R&D で現実化しやすい二つの要求—**スケール変動**（メッシュ／グラフのサイズ）と**マルチフィジックスの合成性**（同一基盤上の異なる相互作用則）—に対し、**物理情報付きグラフ・サロゲート**を検証する、研究向けのコンパクトなコードベースです。
-
-Phase 1 で示した「構造なしモデル対グラフ」の対比を発展させ、Phase 2 では**異種グラフの圏論的読解**を前面に出します。すなわち、バネ様・ダンパ様の相互作用は単なる「エッジ属性の違い」ではなく、**スキーマ上で分離すべき morphism の型**であり、それを **PyTorch Geometric** の `HeteroData` と `HeteroConv` として具体化します。
+**ACT–GNN Phase 2** は Phase 1 の流れを継承し、(i) デプロイ時に変動する**グラフサイズ（スケール）**と、(ii) 同一離散基盤上に共存する**複数の構成則（マルチフィジックス）**という二つの圧力下で、**物理情報付きグラフ・サロゲート**を検証します。設計上の主眼は、異種相互作用を単一の混在 `edge_index` の不透明な属性ではなく、**スキーマ上の構造**として扱い、PyTorch Geometric では `HeteroData` と `HeteroConv` に具体化することです。
 
 | レイヤ | 本リポジトリでの役割 |
 | --- | --- |
-| **Julia / ACT** | `Catlab.jl` と `Catlab.Graphs` によるグラフ構築・圏論スタックの検証（`test_catlab.jl`）。`Project.toml` では **DifferentialEquations.jl** と **JSON3.jl** も固定しており、「Julia でモデル・Python で学習」という二段構成の拡張（連成动力学、JSON ブリッジ）を想定した構成です。 |
-| **Python / PyG** | サロゲート実験: メッセージパッシングのスケール耐性 vs 固定幾何 MLP（`demo1_scale_generalization.py`）、バネ＋ダンパのマルチフィジックス直列チェーンにおける同質 GCN と Hetero GCN の比較（`demo2_category_multiphysics.py`）。 |
+| **Julia / ACT** | `Catlab.jl` と `Catlab.Graphs` による、監査しやすい最小の**圏論ツールチェーン**（`test_catlab.jl`）。`Project.toml` では **DifferentialEquations.jl** と **JSON3.jl** を固定し、动力学寄りの拡張と Python 向けの構造化インタチェンジを想定しています。 |
+| **Python / PyG** | 実行可能なトラックとして、**スケール**（`demo1_scale_generalization.py`）、**マルチフィジックス**（`demo2_category_multiphysics.py`）、任意の **JSON 基準ベンチ**（`compare_loss_visualization.py`）、**デバイス確認**（`test_gpu.py`）。 |
 
-**実装されている物理。** ノード状態は 2 次元 \([u, v]\)（位置・速度）。**バネ**は変位 \((u_j-u_i)\) に比例する力、**ダンパ**は速度差 \((v_j-v_i)\) に比例する力を与え、**陽的オイラー**による 1 ステップ先状態を教師信号とします。
+**実装されている物理。** 各ノードは 2 次元状態 \([u, v]\)（1 次元座標上の位置・速度）。**バネ**はフックの法則に従い \(\propto (u_j - u_i)\)、**ダンパ**（該当スクリプト）は \(\propto (v_j - v_i)\) の力を寄与します。教師信号は、合力から \(a=F/m\) を得たうえでの**陽的オイラー型 1 ステップ** \(v' = v + a\,\Delta t\)、\(u' = u + v\,\Delta t\)（スクリプトごとの更新順はソース参照）。
 
-**技術スタック（ソース・マニフェスト由来）。** Julia: `Catlab`, `DifferentialEquations`, `JSON3`。Python: `torch`, `torch_geometric`, `matplotlib`。GPU 利用時は `test_gpu.py` で環境確認が可能です。
+**インデックス契約（Julia ↔ PyG）。** Julia 側のグラフ API は慣習として**1 始まり**の頂点ラベルを用いますが、PyTorch Geometric の `edge_index` は**0 始まり**です。**Catlab → JSON → Python** の経路では、エクスポートまたは取り込みの境界で **1 始まりから 0 始まりへの変換を一度だけ**行い、下流の学習では単一の整数ラベリングを前提にしてください（言語混在時の off-by-one を防ぐため）。
+
+| トラック | スクリプト | 示していること |
+| --- | --- | --- |
+| **スケール** | `demo1_scale_generalization.py` | 平坦化 **NaiveMLP** は設計時のノード数に固定され、\(N=10\) 用に構築したのち **\(N=50\)** を流すと **`RuntimeError`**（形状不一致）。小さな **GCN** は `edge_index` だけ変えて大きいチェーンでも forward 可能（本デモは**学習なし**、`torch.manual_seed(0)`）。 |
+| **マルチフィジックス** | `demo2_category_multiphysics.py` | 偶数長チェーン上で **バネ**・**ダンパ**を交互配置。**HomogeneousGNN** は両者を同一 `edge_index` に混在、**CategoryHeteroGNN** は `HeteroConv` 内の別 **GCNConv** 経路に分離。**`hetero_loss_comparison.png`** を出力。 |
+| **任意 JSON ベンチ** | `compare_loss_visualization.py` | **`graph_from_catlab.json`** で与えた固定グラフ上のバネのみのターゲット。**200** 組の \((x,y)\) を **150 学習 / 50 テスト**に分割し、各エポックの**テスト** MSE のみを **`loss_comparison_test.png`** にプロット。PyG 用 JSON ローダ（例: `import_catlab_json_to_pyg`）が本ツリーには含まれません。 |
+
+**既定ハイパーパラメータ（ソース値）。**
+
+| 設定 | `demo1_scale_generalization.py` | `demo2_category_multiphysics.py` | `compare_loss_visualization.py`（実行可能な場合） |
+| --- | --- | --- | --- |
+| 設計 \(N\) / ノード数 | 設計 \(N_{\mathrm{design}}=10\)、推論 \(N=50\) | `num_nodes = 12`（偶数・チェーン位相） | JSON 由来の `Data.num_nodes` |
+| 特徴 / 隠れ次元 | `feat_dim = 2`、GNN `hidden = 32` | `feat_dim = 2`、`hidden = 64` | `feat_dim = 2`、GNN・MLP とも **`hidden = 96`** |
+| 最適化 / エポック | *（forward のみ）* | `Adam`、`lr = 1e-3`、`epochs = 200` | `Adam`、`lr = 1e-3`、`epochs = 800` |
+| 物理定数 | — | `k = 1.0`、`c = 0.8`、`m = 1.0`、`dt = 0.05` | `k = 1.0`、`m = 1.0`、`dt = 0.05`（バネのみ） |
+| データ乱数 | \(x_{50}\) 用 `torch.randn` | 固定プール `pool_size = 64`；`torch.manual_seed(7)`、ジェネレータ `12345`；`pos_scale = 1.0`、`vel_scale = 0.6` | `torch.manual_seed(42)`、データセット用 `42`；`pos_scale = 1.0`、`vel_scale = 0.5`；**200** サンプル、**150 学習 / 50 テスト** |
+| PyG トポロジ | 有向チェーン辺 \((i,i{+}1)\) | バネ \((0,1),(2,3),\ldots\)、ダンパ \((1,2),(3,4),\ldots\)；各結合を **双方向** に展開して `edge_index` 化 | `edge_index` から反向辺を除き**無向ペア 1 本ずつ**数えたバネ集合 |
+
+**実装上の注記（`compare_loss_visualization.py`）。** 1 ステップのバネ–質量ターゲットが誘導する写像 \(x \mapsto y\) は **\(x\) について線形**です。十分な幅の平坦化 MLP は任意の線形写像に近づけやすい一方、重み共有する GCN は**異なる関数族**を誘導するため、テスト曲線は「同容量での公平比較」ではなく、同一隠れ次元・同一最適化デフォルト下の対照実験として解釈してください（ファイル先頭コメント参照）。
 
 ### アーキテクチャ
 
-多くの研究室と同様、**Julia で宣言的・組合せ的モデリング**、**Python で可微分学習**という二言語パイプラインです。
+| 段階 | 所在 | 役割 |
+| --- | --- | --- |
+| 1. 圏論的インシデンス | Julia（`test_catlab.jl`、将来の ACSets） | 学習前に、頂点を**対象**、辺を**型付き生成 morphism** として宣言する。 |
+| 2. スキーマ → テンソル | Python（`demo2_*`、任意の JSON ローダ） | 関係型を **互いに素な** `edge_index`（`HeteroData`）として具現化するか、意図的に混在させたベースライン（`Data`）とする。 |
+| 3. 学習・プロット | Python（PyG + `matplotlib`） | 物理が生成した 1 ステップ先を教師にサロゲートを学習し、損失曲線や PNG を出力する。 |
 
-1. **圏論的モデリング（Julia）**  
-   `test_catlab.jl` は `Catlab.Graphs` 上で小さなグラフを構成し、頂点を**対象**、辺を**生成 morphism** とみなす最小例です。大規模な ACSets / C-set で質量・バネ・ダンパなどの型付き配線を規定し、エクスポートへ繋げる意図を示す「ACT の背骨」です。
+プロセスの補足:
 
-2. **スキーマの具現化 → 深層学習（Python）**  
-   `demo2_category_multiphysics.py` は JSON を経由せず、バネ辺とダンパ辺を**別関係**として構築し `HeteroData` に載せ、`HeteroConv` 内で **独立した `GCNConv`** として学習します。圏論的プレゼンテーションにおける「異なる hom の分離」の直接的な実装です。
-
-3. **オプションの往復（JSON ブリッジ）**  
-   `compare_loss_visualization.py` は **Catlab 由来の位相**（`graph_from_catlab.json`）と PyG 用ローダを前提にしています。生成 JSON は `.gitignore` で除外されており、現リビジョンではローダは同梱されていません。資産を復元・用意した場合の**拡張トラック**として位置づけられます：Julia のインシデンス構造 → JSON → `Data` → 学習。
+1. **Julia** で依存スタック（`Catlab`、任意で `DifferentialEquations`、`JSON3`）を確立し、**構造化**グラフデータを出力可能にする。**JSON は `.gitignore` によりリポジトリ外**が既定で、再現性はパイプライン側で担保します。
+2. **Python** はスキーマを**直接構築**（`demo2_category_multiphysics.py`）するか、エクスポート位相を**取り込む**（`compare_loss_visualization.py`）かに分かれ、いずれも上記の **0 始まり**契約に従います。
+3. **ベースライン**は常に同所に置きます（マルチフィジックスでは同質対 Hetero、JSON トラックでは GNN 対 MLP、スケールデモでは MLP の失敗モード）。
 
 ```mermaid
 flowchart LR
@@ -162,19 +188,19 @@ flowchart LR
 
 ### ファイル構成
 
-| パス | 説明 |
+| パス | 役割 |
 | --- | --- |
-| `Project.toml` / `Manifest.toml` | Julia 依存: **Catlab**, **DifferentialEquations**, **JSON3**。 |
-| `test_catlab.jl` | Catlab グラフのスモークテスト。Julia 側のエントリ。 |
-| `demo1_scale_generalization.py` | **Phase 2 スケール軸:** \(N=10\) 設計の MLP と、\(N=50\) でも動作する GNN の対比（学習なし・初期化のみ）。 |
-| `demo2_category_multiphysics.py` | **Phase 2 マルチフィジックス軸:** 同質 GCN と Hetero GCN の学習比較。`hetero_loss_comparison.png` を出力。 |
-| `compare_loss_visualization.py` | **任意:** 固定グラフ上の GNN vs MLP のテスト損失。`graph_from_catlab.json` と JSON→PyG ローダが必要（本ツリーには未同梱）。 |
-| `test_gpu.py` | CUDA / `torch.matmul` の簡易確認。 |
-| `.gitignore` | 仮想環境と `*.json` 出力の除外。 |
+| `Project.toml` / `Manifest.toml` | Julia 環境: **Catlab**、**DifferentialEquations**、**JSON3**。 |
+| `test_catlab.jl` | `Catlab` / `Catlab.Graphs` をロードし、最小グラフを構築してインシデンス数を表示。 |
+| `demo1_scale_generalization.py` | スケール軸: `CategoryInformedGNN` と `NaiveMLP`、可変 \(N\)、最適化ループなし。 |
+| `demo2_category_multiphysics.py` | マルチフィジックス軸: `HomogeneousGNN` と `CategoryHeteroGNN`、学習ループ、`hetero_loss_comparison.png`。 |
+| `compare_loss_visualization.py` | 任意 JSON 軸: GNN と MLP、テスト損失の推移、`loss_comparison_test.png`。 |
+| `test_gpu.py` | CUDA 有無と大規模 `matmul` の計測。 |
+| `.gitignore` | 仮想環境・キャッシュ・**`*.json`** 出力データ。 |
 
-### クイックスタート・使い方
+### クイックスタート
 
-**Julia（圏論・モデリング側）**
+**Julia**
 
 ```bash
 cd /path/to/physics-gnn-surrogate-act
@@ -182,7 +208,7 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 julia --project=. test_catlab.jl
 ```
 
-**Python（学習パイプライン側）**
+**Python**
 
 ```bash
 python -m venv .venv
@@ -194,14 +220,8 @@ python demo2_category_multiphysics.py
 python test_gpu.py
 ```
 
-**任意:** `graph_from_catlab.json` と互換の `import_catlab_json_to_pyg`（等）を配置・復元したうえで:
+**任意（JSON トラック）:** リポジトリ直下に `graph_from_catlab.json` と互換の `import_catlab_json_to_pyg`（または import の修正）を置いたうえで:
 
 ```bash
 python compare_loss_visualization.py
 ```
-
-出力: デモ2で `hetero_loss_comparison.png`、任意スクリプトで条件が揃えば `loss_comparison_test.png`。
-
-### インバウンド向けの位置づけ
-
-Phase 2 は**小さく監査可能で主張が明確**な構成にしています。マルチフィジックス環境で**なぜ**異種グラフ学習が効くのか、Julia 側の **ACT 風モデリング**を PyG 学習の上流に置くときの**設計意図**（インデックス、型付き辺、ベースライン比較）を隠さない—ハイエンドなポートフォリオとして、海外の R&D エンジニア・研究者との技術対話のたたき台になることを想定しています。
