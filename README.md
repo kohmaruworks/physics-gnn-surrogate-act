@@ -10,7 +10,7 @@
 
 ## English
 
-### Title & Overview
+### Overview
 
 **ACT–GNN Phase 2** extends the Phase‑1 line of work: it stress-tests **physics-informed graph surrogates** where (i) **graph cardinality** changes across deployment (scale), and (ii) **multiple constitutive laws** share the same discrete substrate (multiphysics). The central design choice is to treat heterogeneous interactions as **schema-level structure**—materialized in PyTorch Geometric as `HeteroData` with `HeteroConv`—rather than as a single mixed edge set with opaque attributes.
 
@@ -120,7 +120,7 @@ python compare_loss_visualization.py
 
 ## 日本語
 
-### タイトルと概要
+### 概要
 
 **ACT–GNN Phase 2** は Phase 1 の流れを継承し、(i) デプロイ時に変動する**グラフサイズ（スケール）**と、(ii) 同一離散基盤上に共存する**複数の構成則（マルチフィジックス）**という二つの圧力下で、**物理情報付きグラフ・サロゲート**を検証します。設計上の主眼は、異種相互作用を単一の混在 `edge_index` の不透明な属性ではなく、**スキーマ上の構造**として扱い、PyTorch Geometric では `HeteroData` と `HeteroConv` に具体化することです。
 
