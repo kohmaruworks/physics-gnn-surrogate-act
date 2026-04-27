@@ -17,7 +17,7 @@
 | Layer | Role in this repository |
 | --- | --- |
 | **Julia / ACT** | `Catlab.jl` and `Catlab.Graphs` for a minimal, auditable **categorical tooling spine** (`test_catlab.jl`). `Project.toml` pins **DifferentialEquations.jl** and **JSON3.jl** for dynamics-heavy extensions and structured interchange toward Python. |
-| **Python / PyG** | Executable tracks: **scale** (`demo1_scale_generalization.py`: message passing vs fixed-layout MLP), **multiphysics** (`demo2_category_multiphysics.py`: spring vs damper channels, homogeneous vs hetero GCN), optional **JSON-grounded** benchmark (`compare_loss_visualization.py`), and **device smoke test** (`test_gpu.py`). |
+| **Python / PyG** | Executable tracks: **scale** (`demo1_scale_generalization.py`), **multiphysics** (`demo2_category_multiphysics.py`), **Phase 1 §3–matched** GNN vs MLP benchmark (`compare_loss_visualization.py` + bundled `import_catlab_json_to_pyg.py`), optional Zenn figure helper (`article_figures_for_zenn.py`), and **device smoke test** (`test_gpu.py`). |
 
 **Implemented physics.** Each node carries a 2D state \([u, v]\) (scalar position and velocity along a 1D chain). **Springs** apply Hooke forces \(\propto (u_j - u_i)\); **dampers** apply forces \(\propto (v_j - v_i)\) where applicable. Supervision is a **single explicit Euler-type step** \(v' = v + (F/m)\,\Delta t\), \(u' = u + v\,\Delta t\) with forces assembled from the active topology (see source for exact update order per script).
 
@@ -53,7 +53,7 @@
 Process detail:
 
 1. **Julia** instantiates the dependency stack (`Catlab`, optional `DifferentialEquations`, `JSON3`) and can emit **structured** graph data; **JSON artifacts are gitignored** (see `.gitignore`) so exports stay reproducible but out of version control unless you vendor them.
-2. **Python** either **constructs** the hetero schema directly (`demo2_category_multiphysics.py`) or **ingests** exported topology (`compare_loss_visualization.py` path) with the **0-based** indexing contract above.
+2. **Python** either **constructs** the hetero schema directly (`demo2_category_multiphysics.py`) or **ingests** JSON via `import_catlab_json_to_pyg.py` (`compare_loss_visualization.py` loads **`spring_mass_chain_5.json`** from sibling **`physics-gnn-surrogate-basic`**) with the **0-based** indexing contract above.
 3. **Baselines** are always co-located: homogeneous vs hetero in multiphysics; GNN vs MLP in optional JSON track; MLP failure mode in scale demo.
 
 ```mermaid
@@ -84,9 +84,11 @@ flowchart LR
 | `test_catlab.jl` | Loads `Catlab` / `Catlab.Graphs`, builds a tiny graph, prints incidence counts. |
 | `demo1_scale_generalization.py` | Scale track: `CategoryInformedGNN` vs `NaiveMLP`, variable \(N\), no optimization loop. |
 | `demo2_category_multiphysics.py` | Multiphysics track: `HomogeneousGNN` vs `CategoryHeteroGNN`, training loop; figure → **`zenn-articles/images/hetero_loss_comparison.png`**. |
-| `compare_loss_visualization.py` | Phase 1 §3-matched GNN vs MLP training curve; figure → **`zenn-articles/images/loss_comparison_test.png`**. |
+| `import_catlab_json_to_pyg.py` | `catlab_directed_graph_v1` JSON → `torch_geometric.data.Data` (same contract as Phase 1). |
+| `compare_loss_visualization.py` | Phase 1 §3-matched GNN vs MLP training curve; requires **`../physics-gnn-surrogate-basic/spring_mass_chain_5.json`**; figure → **`zenn-articles/images/loss_comparison_test.png`**. |
+| `article_figures_for_zenn.py` | Optional: writes Zenn images (e.g. teacher scatter) using `graph_from_catlab.json` when present. |
 | `test_gpu.py` | CUDA availability and large `matmul` timing. |
-| `.gitignore` | Virtualenvs, caches, and **`*.json`** export data. |
+| `.gitignore` | Virtualenvs, caches, **`*.json`**, and generated **PNG**s (`loss_comparison_test.png`, `hetero_loss_comparison.png`). |
 
 ### Quick Start
 
@@ -110,11 +112,13 @@ python demo2_category_multiphysics.py
 python test_gpu.py
 ```
 
-**Optional (JSON track):** place `graph_from_catlab.json` plus a compatible `import_catlab_json_to_pyg` (or adjust the import) in the repo root, then:
+**Phase 1 §3 benchmark (`compare_loss_visualization.py`):** clone or place sibling repo **[physics-gnn-surrogate-basic](https://github.com/kohmaruworks/physics-gnn-surrogate-basic)** next to this one so **`../physics-gnn-surrogate-basic/spring_mass_chain_5.json`** exists (generate via Julia export if needed). Training curves are written to **`zenn-articles/images/loss_comparison_test.png`** when **`../zenn-articles/images`** exists.
 
 ```bash
 python compare_loss_visualization.py
 ```
+
+**Optional (Zenn article figures):** with `graph_from_catlab.json` in this repo and **`../zenn-articles/images`**, run `python article_figures_for_zenn.py` (used by the Phase 1 / Phase 2 article pipeline).
 
 <a id="japanese"></a>
 
@@ -127,7 +131,7 @@ python compare_loss_visualization.py
 | レイヤ | 本リポジトリでの役割 |
 | --- | --- |
 | **Julia / ACT** | `Catlab.jl` と `Catlab.Graphs` による、監査しやすい最小の**圏論ツールチェーン**（`test_catlab.jl`）。`Project.toml` では **DifferentialEquations.jl** と **JSON3.jl** を固定し、动力学寄りの拡張と Python 向けの構造化インタチェンジを想定しています。 |
-| **Python / PyG** | 実行可能なトラックとして、**スケール**（`demo1_scale_generalization.py`）、**マルチフィジックス**（`demo2_category_multiphysics.py`）、任意の **JSON 基準ベンチ**（`compare_loss_visualization.py`）、**デバイス確認**（`test_gpu.py`）。 |
+| **Python / PyG** | 実行可能なトラックとして、**スケール**（`demo1_scale_generalization.py`）、**マルチフィジックス**（`demo2_category_multiphysics.py`）、**第3回同条件**の GNN/MLP 比較（`compare_loss_visualization.py` ＋同梱 `import_catlab_json_to_pyg.py`）、任意の **Zenn 図**（`article_figures_for_zenn.py`）、**デバイス確認**（`test_gpu.py`）。 |
 
 **実装されている物理。** 各ノードは 2 次元状態 \([u, v]\)（1 次元座標上の位置・速度）。**バネ**はフックの法則に従い \(\propto (u_j - u_i)\)、**ダンパ**（該当スクリプト）は \(\propto (v_j - v_i)\) の力を寄与します。教師信号は、合力から \(a=F/m\) を得たうえでの**陽的オイラー型 1 ステップ** \(v' = v + a\,\Delta t\)、\(u' = u + v\,\Delta t\)（スクリプトごとの更新順はソース参照）。
 
@@ -163,7 +167,7 @@ python compare_loss_visualization.py
 プロセスの補足:
 
 1. **Julia** で依存スタック（`Catlab`、任意で `DifferentialEquations`、`JSON3`）を確立し、**構造化**グラフデータを出力可能にする。**JSON は `.gitignore` によりリポジトリ外**が既定で、再現性はパイプライン側で担保します。
-2. **Python** はスキーマを**直接構築**（`demo2_category_multiphysics.py`）するか、エクスポート位相を**取り込む**（`compare_loss_visualization.py`）かに分かれ、いずれも上記の **0 始まり**契約に従います。
+2. **Python** はスキーマを**直接構築**（`demo2_category_multiphysics.py`）するか、JSON を **`import_catlab_json_to_pyg` で取り込む**（`compare_loss_visualization.py` は**隣接** `physics-gnn-surrogate-basic` の **`spring_mass_chain_5.json`**）かに分かれ、いずれも上記の **0 始まり**契約に従います。
 3. **ベースライン**は常に同所に置きます（マルチフィジックスでは同質対 Hetero、JSON トラックでは GNN 対 MLP、スケールデモでは MLP の失敗モード）。
 
 ```mermaid
@@ -194,9 +198,11 @@ flowchart LR
 | `test_catlab.jl` | `Catlab` / `Catlab.Graphs` をロードし、最小グラフを構築してインシデンス数を表示。 |
 | `demo1_scale_generalization.py` | スケール軸: `CategoryInformedGNN` と `NaiveMLP`、可変 \(N\)、最適化ループなし。 |
 | `demo2_category_multiphysics.py` | マルチフィジックス軸: `HomogeneousGNN` と `CategoryHeteroGNN`、学習ループ、図 → `zenn-articles/images/hetero_loss_comparison.png`。 |
-| `compare_loss_visualization.py` | 第3回同条件: TwoLayerGCN vs MLP、図 → `zenn-articles/images/loss_comparison_test.png`。 |
+| `import_catlab_json_to_pyg.py` | `catlab_directed_graph_v1` 形式の JSON → `Data` 復元（Phase 1 と同一契約）。 |
+| `compare_loss_visualization.py` | 第3回同条件: TwoLayerGCN vs MLP。要 **`../physics-gnn-surrogate-basic/spring_mass_chain_5.json`**。図 → `zenn-articles/images/loss_comparison_test.png`。 |
+| `article_figures_for_zenn.py` | 任意: `graph_from_catlab.json` 等から Zenn 用 PNG を `zenn-articles/images` へ。 |
 | `test_gpu.py` | CUDA 有無と大規模 `matmul` の計測。 |
-| `.gitignore` | 仮想環境・キャッシュ・**`*.json`** 出力データ。 |
+| `.gitignore` | 仮想環境・キャッシュ、**`*.json`**、生成 **PNG**（`loss_comparison_test.png`、`hetero_loss_comparison.png`）。 |
 
 ### クイックスタート
 
@@ -220,8 +226,10 @@ python demo2_category_multiphysics.py
 python test_gpu.py
 ```
 
-**任意（JSON トラック）:** リポジトリ直下に `graph_from_catlab.json` と互換の `import_catlab_json_to_pyg`（または import の修正）を置いたうえで:
+**第3回同条件のベンチ（`compare_loss_visualization.py`）:** 本リポと**同じ親ディレクトリ**に **[physics-gnn-surrogate-basic](https://github.com/kohmaruworks/physics-gnn-surrogate-basic)** を置き、**`../physics-gnn-surrogate-basic/spring_mass_chain_5.json`** があること（Julia 側エクスポートで生成可）。図は **`../zenn-articles/images`** があればその **`loss_comparison_test.png`** へ。
 
 ```bash
 python compare_loss_visualization.py
 ```
+
+**任意（Zenn 図表）:** 本リポに `graph_from_catlab.json` があり、**`../zenn-articles/images`** がある場合に `python article_figures_for_zenn.py`（連載用の図を出力）。
