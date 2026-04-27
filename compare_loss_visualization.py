@@ -9,6 +9,7 @@
 - MLP — 2 隠れ層、隠れ幅 16、入出力 N*2
 - 最適化: Adam, lr=0.02, 100 エポック
 - 指標: 毎エポックの**訓練** MSE（1 グラフ・第3回と同じ手順の比較）
+- 図: `zenn-articles/images/loss_comparison_test.png`（隣接 `zenn-articles` がある場合。ない場合は本リポ直下、.gitignore）
 """
 
 from __future__ import annotations
@@ -229,17 +230,14 @@ def main() -> None:
     ax.grid(True, alpha=0.35, linestyle="--")
     fig.tight_layout()
 
-    out_png = repo / "loss_comparison_test.png"
-    fig.savefig(out_png, dpi=150, bbox_inches="tight")
-
+    # 図表は zenn-articles/images に保存（本リポには残さない）
     zenn_images = repo.parent / "zenn-articles" / "images"
-    if zenn_images.is_dir():
-        zenn_out = zenn_images / "phase1-06-loss-comparison-test.png"
-        fig.savefig(zenn_out, dpi=150, bbox_inches="tight")
-        print(f"Saved figure (Zenn): {zenn_out}")
-
+    out_path = zenn_images / "loss_comparison_test.png"
+    if not zenn_images.is_dir():
+        out_path = repo / "loss_comparison_test.png"
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved figure: {out_png}")
+    print(f"Saved figure: {out_path}")
 
 
 if __name__ == "__main__":

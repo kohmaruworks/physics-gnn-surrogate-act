@@ -4,6 +4,8 @@
 
 正解はスプリング辺で F ∝ (u_j - u_i)、ダンパー辺で F ∝ (v_j - v_i) を足し合わせ、
 a = F/m とオイラーで次状態を計算。
+
+図: `zenn-articles/images/hetero_loss_comparison.png`（隣接 zenn リポがある場合。ない場合は本リポ直下、.gitignore）
 """
 
 from __future__ import annotations
@@ -273,17 +275,13 @@ def main() -> None:
     ax.grid(True, alpha=0.35, linestyle="--")
     fig.tight_layout()
 
-    out = repo / "hetero_loss_comparison.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
-
     zenn_images = repo.parent / "zenn-articles" / "images"
-    if zenn_images.is_dir():
-        zenn_out = zenn_images / "phase1-06-hetero-vs-homo-mse.png"
-        fig.savefig(zenn_out, dpi=150, bbox_inches="tight")
-        print(f"Saved figure (Zenn): {zenn_out}")
-
+    out_path = zenn_images / "hetero_loss_comparison.png"
+    if not zenn_images.is_dir():
+        out_path = repo / "hetero_loss_comparison.png"
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved figure: {out}")
+    print(f"Saved figure: {out_path}")
 
 
 if __name__ == "__main__":

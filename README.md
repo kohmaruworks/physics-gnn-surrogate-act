@@ -26,21 +26,21 @@
 | Track | Script | What it fixes / proves |
 | --- | --- | --- |
 | **Scale** | `demo1_scale_generalization.py` | A flattened **NaiveMLP** is tied to a fixed \(N\); at inference with \(N=50\) after being sized for \(N=10\) it raises **`RuntimeError`** (shape mismatch). A small **GCN** stack accepts variable `edge_index` and completes forward on the larger chain (**no training** in this demo; `torch.manual_seed(0)`). |
-| **Multiphysics** | `demo2_category_multiphysics.py` | Alternating **spring** and **damper** bonds on an even-length chain; **HomogeneousGNN** mixes both relation types in one `edge_index`; **CategoryHeteroGNN** routes springs and dampers through **separate** `GCNConv` towers inside `HeteroConv`. Writes **`hetero_loss_comparison.png`**. |
-| **Optional JSON benchmark** | `compare_loss_visualization.py` | Spring-only targets on a **fixed** graph loaded from **`graph_from_catlab.json`**; **150 / 50** train–test split over **200** synthetic states; logs **test** MSE each epoch to **`loss_comparison_test.png`**. Requires a PyG JSON loader (e.g. `import_catlab_json_to_pyg`) not shipped in this revision. |
+| **Multiphysics** | `demo2_category_multiphysics.py` | Alternating **spring** and **damper** bonds on an even-length chain; **HomogeneousGNN** mixes both relation types in one `edge_index`; **CategoryHeteroGNN** routes springs and dampers through **separate** `GCNConv` towers inside `HeteroConv`. Writes **`zenn-articles/images/hetero_loss_comparison.png`** when that folder exists (else repo root, gitignored). |
+| **JSON + Phase 1 §3 match** | `compare_loss_visualization.py` | **Same** supervision as [Phase 1 `train_spring_mass_gcn.py`](https://github.com/kohmaruworks/physics-gnn-surrogate-basic): **`spring_mass_chain_5.json`** (place sibling repo `physics-gnn-surrogate-basic` next to this one), **TwoLayerGCN** (hidden 16) vs **NaiveMLP**, `Adam` **lr=0.02**, **100** epochs, **training** MSE. Writes **`zenn-articles/images/loss_comparison_test.png`** if that folder exists (else this repo root, gitignored). |
 
 **Default hyperparameters (as in source).**
 
 | Setting | `demo1_scale_generalization.py` | `demo2_category_multiphysics.py` | `compare_loss_visualization.py` (when runnable) |
 | --- | --- | --- | --- |
-| Design \(N\) / nodes | Train layout \(N_{\mathrm{design}}=10\); inference \(N=50\) | `num_nodes = 12` (even; chain topology) | `num_nodes = int(Data.num_nodes)` from JSON |
-| Features / hidden | `feat_dim = 2`, GNN `hidden = 32` | `feat_dim = 2`, `hidden = 64` | `feat_dim = 2`, **both** GNN & MLP `hidden = 96` |
-| Optimizer / epochs | *(none — forward only)* | `Adam`, `lr = 1e-3`, `epochs = 200` | `Adam`, `lr = 1e-3`, `epochs = 800` |
-| Physics constants | — | `k = 1.0`, `c = 0.8`, `m = 1.0`, `dt = 0.05` | `k = 1.0`, `m = 1.0`, `dt = 0.05` (spring-only target) |
-| Data randomness | `torch.randn` for \(x_{50}\) | Initial state pool: `pool_size = 64`; `torch.manual_seed(7)`, generator seed `12345`; `pos_scale = 1.0`, `vel_scale = 0.6` | `torch.manual_seed(42)`; dataset generator `42`; `pos_scale = 1.0`, `vel_scale = 0.5`; **200** samples, **150 train / 50 test** |
-| PyG topology | Directed chain edges \((i,i{+}1)\) | Springs: pairs \((0,1),(2,3),\ldots\); dampers: \((1,2),(3,4),\ldots\); each logical bond expanded **bidirectionally** for `edge_index` | `spring_pairs` from `edge_index` by **deduplicating** opposite directed arcs (one spring per undirected pair) |
+| Design \(N\) / nodes | Train layout \(N_{\mathrm{design}}=10\); inference \(N=50\) | `num_nodes = 12` (even; chain topology) | `Data.num_nodes` from **`spring_mass_chain_5.json`** (sibling `physics-gnn-surrogate-basic`) |
+| Features / hidden | `feat_dim = 2`, GNN `hidden = 32` | `feat_dim = 2`, `hidden = 64` | `feat_dim = 2`, GNN (TwoLayer) & MLP **`hidden = 16`** |
+| Optimizer / epochs | *(none — forward only)* | `Adam`, `lr = 1e-3`, `epochs = 200` | `Adam`, `lr = 0.02`, `epochs = 100`; **training** MSE (Phase 1 §3 match) |
+| Physics constants | — | `k = 1.0`, `c = 0.8`, `m = 1.0`, `dt = 0.05` | — (teacher **`y`** is Julia ODE in JSON) |
+| Data randomness | `torch.randn` for \(x_{50}\) | Initial state pool: `pool_size = 64`; `torch.manual_seed(7)`, generator seed `12345`; `pos_scale = 1.0`, `vel_scale = 0.6` | **One** graph, one \((x,y)\) pair — not a multi-split benchmark |
+| PyG topology | Directed chain edges \((i,i{+}1)\) | Springs: pairs \((0,1),(2,3),\ldots\); dampers: \((1,2),(3,4),\ldots\); each logical bond expanded **bidirectionally** for `edge_index` | Chain edges from JSON `edge_index` |
 
-**Implementation note (`compare_loss_visualization.py`).** The supervised map \(x \mapsto y\) induced by one linearized spring-mass step is **linear in \(x\)**; a wide flattened MLP can approximate arbitrary linear maps, while a weight-sharing GCN induces a **different function class**—so test curves are **not** claimed to be a “fair capacity match,” only a controlled comparison under shared hidden width and optimizer defaults (see file header comments).
+**Implementation note (`compare_loss_visualization.py`).** With ODE-supervised single-graph training, a **TwoLayerGCN** and a **NaiveMLP** (same `lr`, `epochs`) can reach different **training** MSE plateaus; this matches the function-class discussion in the [Phase 1 §6](https://zenn.dev/kohmaruworks/articles/phase1-06-training-outlook) article. Figures are versioned in **`zenn-articles/images/loss_comparison_test.png`**, not in this repository.
 
 ### Architecture
 
@@ -83,8 +83,8 @@ flowchart LR
 | `Project.toml` / `Manifest.toml` | Julia environment: **Catlab**, **DifferentialEquations**, **JSON3**. |
 | `test_catlab.jl` | Loads `Catlab` / `Catlab.Graphs`, builds a tiny graph, prints incidence counts. |
 | `demo1_scale_generalization.py` | Scale track: `CategoryInformedGNN` vs `NaiveMLP`, variable \(N\), no optimization loop. |
-| `demo2_category_multiphysics.py` | Multiphysics track: `HomogeneousGNN` vs `CategoryHeteroGNN`, training loop, `hetero_loss_comparison.png`. |
-| `compare_loss_visualization.py` | Optional JSON track: GNN vs MLP, test-only loss trace, `loss_comparison_test.png`. |
+| `demo2_category_multiphysics.py` | Multiphysics track: `HomogeneousGNN` vs `CategoryHeteroGNN`, training loop; figure → **`zenn-articles/images/hetero_loss_comparison.png`**. |
+| `compare_loss_visualization.py` | Phase 1 §3-matched GNN vs MLP training curve; figure → **`zenn-articles/images/loss_comparison_test.png`**. |
 | `test_gpu.py` | CUDA availability and large `matmul` timing. |
 | `.gitignore` | Virtualenvs, caches, and **`*.json`** export data. |
 
@@ -136,21 +136,21 @@ python compare_loss_visualization.py
 | トラック | スクリプト | 示していること |
 | --- | --- | --- |
 | **スケール** | `demo1_scale_generalization.py` | 平坦化 **NaiveMLP** は設計時のノード数に固定され、\(N=10\) 用に構築したのち **\(N=50\)** を流すと **`RuntimeError`**（形状不一致）。小さな **GCN** は `edge_index` だけ変えて大きいチェーンでも forward 可能（本デモは**学習なし**、`torch.manual_seed(0)`）。 |
-| **マルチフィジックス** | `demo2_category_multiphysics.py` | 偶数長チェーン上で **バネ**・**ダンパ**を交互配置。**HomogeneousGNN** は両者を同一 `edge_index` に混在、**CategoryHeteroGNN** は `HeteroConv` 内の別 **GCNConv** 経路に分離。**`hetero_loss_comparison.png`** を出力。 |
-| **任意 JSON ベンチ** | `compare_loss_visualization.py` | **`graph_from_catlab.json`** で与えた固定グラフ上のバネのみのターゲット。**200** 組の \((x,y)\) を **150 学習 / 50 テスト**に分割し、各エポックの**テスト** MSE のみを **`loss_comparison_test.png`** にプロット。PyG 用 JSON ローダ（例: `import_catlab_json_to_pyg`）が本ツリーには含まれません。 |
+| **マルチフィジックス** | `demo2_category_multiphysics.py` | 偶数長チェーン上で **バネ**・**ダンパ**を交互配置。**HomogeneousGNN** は両者を同一 `edge_index` に混在、**CategoryHeteroGNN** は `HeteroConv` 内の別 **GCNConv** 経路に分離。図は **`zenn-articles/images/hetero_loss_comparison.png`**（隣接 Zenn リポが無い場合は本リポ直下・`.gitignore` 対象）。 |
+| **第3回条件ベンチ** | `compare_loss_visualization.py` | [基礎編](https://github.com/kohmaruworks/physics-gnn-surrogate-basic) の **`spring_mass_chain_5.json`** と**同一**教師 $y$（Julia ODE）で、**TwoLayerGCN** と**平坦化 MLP**の**訓練**MSE を比較。図は **`zenn-articles/images/loss_comparison_test.png`**。`import_catlab_json_to_pyg.py` を同梱。 |
 
 **既定ハイパーパラメータ（ソース値）。**
 
 | 設定 | `demo1_scale_generalization.py` | `demo2_category_multiphysics.py` | `compare_loss_visualization.py`（実行可能な場合） |
 | --- | --- | --- | --- |
-| 設計 \(N\) / ノード数 | 設計 \(N_{\mathrm{design}}=10\)、推論 \(N=50\) | `num_nodes = 12`（偶数・チェーン位相） | JSON 由来の `Data.num_nodes` |
-| 特徴 / 隠れ次元 | `feat_dim = 2`、GNN `hidden = 32` | `feat_dim = 2`、`hidden = 64` | `feat_dim = 2`、GNN・MLP とも **`hidden = 96`** |
-| 最適化 / エポック | *（forward のみ）* | `Adam`、`lr = 1e-3`、`epochs = 200` | `Adam`、`lr = 1e-3`、`epochs = 800` |
-| 物理定数 | — | `k = 1.0`、`c = 0.8`、`m = 1.0`、`dt = 0.05` | `k = 1.0`、`m = 1.0`、`dt = 0.05`（バネのみ） |
-| データ乱数 | \(x_{50}\) 用 `torch.randn` | 固定プール `pool_size = 64`；`torch.manual_seed(7)`、ジェネレータ `12345`；`pos_scale = 1.0`、`vel_scale = 0.6` | `torch.manual_seed(42)`、データセット用 `42`；`pos_scale = 1.0`、`vel_scale = 0.5`；**200** サンプル、**150 学習 / 50 テスト** |
-| PyG トポロジ | 有向チェーン辺 \((i,i{+}1)\) | バネ \((0,1),(2,3),\ldots\)、ダンパ \((1,2),(3,4),\ldots\)；各結合を **双方向** に展開して `edge_index` 化 | `edge_index` から反向辺を除き**無向ペア 1 本ずつ**数えたバネ集合 |
+| 設計 \(N\) / ノード数 | 設計 \(N_{\mathrm{design}}=10\)、推論 \(N=50\) | `num_nodes = 12`（偶数・チェーン位相） | **`spring_mass_chain_5.json`** の `Data.num_nodes` |
+| 特徴 / 隠れ次元 | `feat_dim = 2`、GNN `hidden = 32` | `feat_dim = 2`、`hidden = 64` | `feat_dim = 2`、GNN（2層）・MLP とも **`hidden = 16`** |
+| 最適化 / エポック | *（forward のみ）* | `Adam`、`lr = 1e-3`、`epochs = 200` | `Adam`、`lr = 0.02`、`epochs = 100`、**訓練**MSE（第3回同条件） |
+| 物理定数 | — | `k = 1.0`、`c = 0.8`、`m = 1.0`、`dt = 0.05` | —（教師 `y` は JSON 内の ODE 参照解） |
+| データ乱数 | \(x_{50}\) 用 `torch.randn` | 固定プール `pool_size = 64`；`torch.manual_seed(7)`、ジェネレータ `12345`；`pos_scale = 1.0`、`vel_scale = 0.6` | **1 グラフ**の \((x,y)\) のみ（**200/150/50 分割ではない**） |
+| PyG トポロジ | 有向チェーン辺 \((i,i{+}1)\) | バネ \((0,1),(2,3),\ldots\)、ダンパ \((1,2),(3,4),\ldots\)；各結合を **双方向** に展開して `edge_index` 化 | JSON の `edge_index`（有向チェーン） |
 
-**実装上の注記（`compare_loss_visualization.py`）。** 1 ステップのバネ–質量ターゲットが誘導する写像 \(x \mapsto y\) は **\(x\) について線形**です。十分な幅の平坦化 MLP は任意の線形写像に近づけやすい一方、重み共有する GCN は**異なる関数族**を誘導するため、テスト曲線は「同容量での公平比較」ではなく、同一隠れ次元・同一最適化デフォルト下の対照実験として解釈してください（ファイル先頭コメント参照）。
+**実装上の注記（`compare_loss_visualization.py`）。** 第3回の**単一**教師付き学習と同条件で、**帰納的バイアス**（重み共有 GCN と平坦 MLP）の違いを**訓練**曲線に重ねる。図面は [Zenn 記事](https://zenn.dev/kohmaruworks/articles/phase1-06-training-outlook) 用の **`zenn-articles/images/loss_comparison_test.png`** です。
 
 ### アーキテクチャ
 
@@ -193,8 +193,8 @@ flowchart LR
 | `Project.toml` / `Manifest.toml` | Julia 環境: **Catlab**、**DifferentialEquations**、**JSON3**。 |
 | `test_catlab.jl` | `Catlab` / `Catlab.Graphs` をロードし、最小グラフを構築してインシデンス数を表示。 |
 | `demo1_scale_generalization.py` | スケール軸: `CategoryInformedGNN` と `NaiveMLP`、可変 \(N\)、最適化ループなし。 |
-| `demo2_category_multiphysics.py` | マルチフィジックス軸: `HomogeneousGNN` と `CategoryHeteroGNN`、学習ループ、`hetero_loss_comparison.png`。 |
-| `compare_loss_visualization.py` | 任意 JSON 軸: GNN と MLP、テスト損失の推移、`loss_comparison_test.png`。 |
+| `demo2_category_multiphysics.py` | マルチフィジックス軸: `HomogeneousGNN` と `CategoryHeteroGNN`、学習ループ、図 → `zenn-articles/images/hetero_loss_comparison.png`。 |
+| `compare_loss_visualization.py` | 第3回同条件: TwoLayerGCN vs MLP、図 → `zenn-articles/images/loss_comparison_test.png`。 |
 | `test_gpu.py` | CUDA 有無と大規模 `matmul` の計測。 |
 | `.gitignore` | 仮想環境・キャッシュ・**`*.json`** 出力データ。 |
 

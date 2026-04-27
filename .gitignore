@@ -9,6 +9,10 @@ env/
 # （Juliaスクリプト実行時に生成されるためリポジトリには含めない）
 *.json
 
+# 学習曲線図（正式な格納先は隣接 zenn-articles/images/）
+loss_comparison_test.png
+hetero_loss_comparison.png
+
 # OS generated files
 .DS_Store
 Thumbs.db
