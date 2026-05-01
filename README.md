@@ -169,6 +169,10 @@ python src_python/import_catlab_json_to_pyg.py
 python src_python/import_catlab_json_to_pyg.py /path/to/custom.json
 ```
 
+### License
+
+This project is licensed under the MIT License. See the [`LICENSE`](LICENSE) file for details.
+
 <a id="japanese"></a>
 
 ## 日本語
@@ -320,8 +324,6 @@ python compare_loss_visualization.py
 python src_python/import_catlab_json_to_pyg.py
 ```
 
-## License
-
-This project is licensed under the MIT License. See the [`LICENSE`](LICENSE) file for details.
+### ライセンス
 
 本プロジェクトは **MIT License** の下で公開されています。詳細はリポジトリ直下の [`LICENSE`](LICENSE) を参照してください。
