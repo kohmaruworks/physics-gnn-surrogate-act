@@ -6,10 +6,18 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 from torch_geometric.data import Data
-from torch_geometric.nn import GCNConv
+
+_REPO_ROOT = Path(__file__).resolve().parent
+if str(_REPO_ROOT / "src_python") not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT / "src_python"))
+
+from models.category_informed_gnn import CategoryInformedGNN
 
 
 def chain_edge_index(num_nodes: int, device: torch.device) -> torch.Tensor:
@@ -22,19 +30,6 @@ def chain_edge_index(num_nodes: int, device: torch.device) -> torch.Tensor:
         src.append(i)
         tgt.append(i + 1)
     return torch.tensor([src, tgt], dtype=torch.long, device=device)
-
-
-class CategoryInformedGNN(nn.Module):
-    def __init__(self, in_channels: int, hidden: int, out_channels: int):
-        super().__init__()
-        self.conv1 = GCNConv(in_channels, hidden)
-        self.conv2 = GCNConv(hidden, hidden)
-        self.lin = nn.Linear(hidden, out_channels)
-
-    def forward(self, x: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
-        h = self.conv1(x, edge_index).relu()
-        h = self.conv2(h, edge_index).relu()
-        return self.lin(h)
 
 
 class NaiveMLP(nn.Module):
@@ -79,7 +74,7 @@ def main() -> None:
     gnn = CategoryInformedGNN(feat_dim, hidden, feat_dim).to(device)
     mlp = NaiveMLP(n_train, feat_dim, hidden).to(device)
 
-    print("(Training phase — skipped; weights are random)")
+    print("(No training step — weights are random)")
     print()
 
     print(f"Inference on unseen scale: N={n_test} (5× larger chain)")

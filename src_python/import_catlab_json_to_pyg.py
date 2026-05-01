@@ -1,6 +1,14 @@
 """
-Catlab 由来の JSON（catlab_directed_graph_v1）を torch_geometric.data.Data に変換する。
-Phase 1（physics-gnn-surrogate-basic）と同一契約。
+Julia（Catlab）からエクスポートされた JSON を torch_geometric.data.Data に変換する。
+
+Single Source of Truth はスキーマ ``format == \"catlab_directed_graph_v1\"`` の JSON。
+
+0-based Contract
+-----------------
+Julia は頂点番号が 1 始まり、PyG の ``edge_index`` は 0 始まり。**引き算（-1）は Julia の
+エクスポート境界（``src_julia/export_catlab_graph_json.jl``）で一度だけ**行う。
+本モジュールでは ``edges`` を **そのまま** ``torch.long`` の ``(2, |E|)`` に整形し、
+Python 側で ``edge_index -= 1`` 等の操作は行わない。
 """
 
 from __future__ import annotations
@@ -30,6 +38,7 @@ def catlab_json_to_data(path: str | Path, *, dtype_edge_index=torch.int64) -> Da
     if len(edges) == 0:
         edge_index = torch.empty((2, 0), dtype=dtype_edge_index)
     else:
+        # 0-based Contract: JSON の整数をそのまま PyG 用テンソルにする（引き算しない）
         edge_index = torch.tensor(edges, dtype=dtype_edge_index).t().contiguous()
 
     data = Data(edge_index=edge_index, num_nodes=num_nodes)
@@ -43,11 +52,15 @@ def catlab_json_to_data(path: str | Path, *, dtype_edge_index=torch.int64) -> Da
     return data
 
 
+def _default_sample_json() -> Path:
+    """リポジトリ直下の ``data/graph_from_catlab.json``（サンプル用）。"""
+    return Path(__file__).resolve().parents[1] / "data" / "graph_from_catlab.json"
+
+
 if __name__ == "__main__":
     import sys
 
-    default_json = Path(__file__).resolve().parent / "graph_from_catlab.json"
-    p = Path(sys.argv[1]) if len(sys.argv) > 1 else default_json
+    p = Path(sys.argv[1]) if len(sys.argv) > 1 else _default_sample_json()
     d = catlab_json_to_data(p)
     print(d)
     print("edge_index:\n", d.edge_index)

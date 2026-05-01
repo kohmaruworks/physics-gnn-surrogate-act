@@ -8,6 +8,8 @@ env/
 # Generated Data Files
 # （Juliaスクリプト実行時に生成されるためリポジトリには含めない）
 *.json
+# サンプル中間表現は連載・チュートリアル用に追跡する
+!data/graph_from_catlab.json
 
 # 学習曲線図（正式な格納先は隣接 zenn-articles/images/）
 loss_comparison_test.png

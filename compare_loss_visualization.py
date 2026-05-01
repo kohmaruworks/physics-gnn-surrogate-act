@@ -15,6 +15,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
+
+_REPO_ROOT = Path(__file__).resolve().parent
+if str(_REPO_ROOT / "src_python") not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT / "src_python"))
 
 import matplotlib.pyplot as plt
 import torch
@@ -169,7 +174,7 @@ def main() -> None:
     loss_mlp_hist: list[float] = []
 
     print(
-        f"data: {json_path.name}  (same as Phase1 §3)\n"
+        f"data: {json_path.name}  (same as Foundation series §3)\n"
         f"device={device}  num_nodes={num_nodes}  "
         f"TwoLayerGCN 2x{hidden}x2  MLP 2h/{hidden}  "
         f"Adam lr={lr}  epochs={n_epochs}\n"
@@ -221,7 +226,7 @@ def main() -> None:
         label="Naive MLP (train)",
     )
     ax.set_title(
-        "GNN vs MLP — training MSE (Phase 1 §3 same: spring_mass_chain_5.json, lr=0.02, 100 ep)",
+        "GNN vs MLP — training MSE (Foundation §3 match: spring_mass_chain_5.json, lr=0.02, 100 ep)",
         fontsize=11,
     )
     ax.set_xlabel("Epoch", fontsize=11)

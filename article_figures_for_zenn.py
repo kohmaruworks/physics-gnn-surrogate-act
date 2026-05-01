@@ -1,10 +1,15 @@
 """
-Zenn 記事用: graph_from_catlab.json の PyG 復元結果を可視化して PNG を保存する。
+Zenn 記事用: `data/graph_from_catlab.json` の PyG 復元結果を可視化して PNG を保存する。
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+import sys
+
+_REPO_ROOT = Path(__file__).resolve().parent
+if str(_REPO_ROOT / "src_python") not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT / "src_python"))
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -46,7 +51,7 @@ def main() -> None:
     zenn_images = repo.parent / "zenn-articles" / "images"
     zenn_images.mkdir(parents=True, exist_ok=True)
 
-    json_path = repo / "graph_from_catlab.json"
+    json_path = repo / "data" / "graph_from_catlab.json"
     data = catlab_json_to_data(json_path)
 
     plt.style.use("dark_background")
@@ -88,7 +93,7 @@ def main() -> None:
     axes[1].legend(handles=[cyan], loc="lower right", framealpha=0.3)
 
     fig.suptitle(
-        "Phase 2 (ACT repo): JSON → torch_geometric.data.Data",
+        "Application module (ACT repo): JSON → torch_geometric.data.Data",
         fontsize=13,
         color="white",
     )
