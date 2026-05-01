@@ -126,7 +126,7 @@ physics-gnn-surrogate-act/
 | `src_python/models/category_informed_gnn.py` | Composable **GCN-style** stack for multi-physics extension (`CategoryInformedGNNLayer`, `CategoryInformedGNN`). |
 | `demo1_scale_generalization.py` | Scale track: `CategoryInformedGNN` vs `NaiveMLP`, variable \(N\), no optimization loop. |
 | `demo2_category_multiphysics.py` | Multiphysics track: `HomogeneousGNN` vs `CategoryHeteroGNN`, training loop; figure → **`zenn-articles/images/hetero_loss_comparison.png`**. |
-| `compare_loss_visualization.py` | Foundation §3–matched GNN vs MLP training curve; requires **`../physics-gnn-surrogate-basic/spring_mass_chain_5.json`**; figure → **`zenn-articles/images/loss_comparison_test.png`**. |
+| `compare_loss_visualization.py` | Foundation §3–matched GNN vs MLP training curve; requires **`../physics-gnn-surrogate-basic/data/spring_mass_chain_5.json`**; figure → **`zenn-articles/images/loss_comparison_test.png`**. |
 | `article_figures_for_zenn.py` | Optional: writes Zenn images (e.g. teacher scatter) using `data/graph_from_catlab.json` when present. |
 | `test_gpu.py` | CUDA availability and large `matmul` timing. |
 | `.gitignore` | Virtualenvs, caches, **`*.json`** (with **exception** `!data/graph_from_catlab.json`), and generated **PNG**s (`loss_comparison_test.png`, `hetero_loss_comparison.png`). |
@@ -154,7 +154,7 @@ python demo2_category_multiphysics.py
 python test_gpu.py
 ```
 
-**Foundation §3 benchmark (`compare_loss_visualization.py`):** clone or place sibling repo **[physics-gnn-surrogate-basic](https://github.com/kohmaruworks/physics-gnn-surrogate-basic)** next to this one so **`../physics-gnn-surrogate-basic/spring_mass_chain_5.json`** exists (generate via Julia export if needed). Training curves are written to **`zenn-articles/images/loss_comparison_test.png`** when **`../zenn-articles/images`** exists.
+**Foundation §3 benchmark (`compare_loss_visualization.py`):** clone or place sibling repo **[physics-gnn-surrogate-basic](https://github.com/kohmaruworks/physics-gnn-surrogate-basic)** next to this one so **`../physics-gnn-surrogate-basic/data/spring_mass_chain_5.json`** exists (generate via Julia export if needed). Training curves are written to **`zenn-articles/images/loss_comparison_test.png`** when **`../zenn-articles/images`** exists.
 
 ```bash
 python compare_loss_visualization.py
@@ -282,7 +282,7 @@ flowchart LR
 | `src_python/models/category_informed_gnn.py` | マルチフィジックス拡張を想定した合成可能な **GCN 型**スタック。 |
 | `demo1_scale_generalization.py` | スケール軸: `CategoryInformedGNN` と `NaiveMLP`、可変 \(N\)、最適化ループなし。 |
 | `demo2_category_multiphysics.py` | マルチフィジックス軸: `HomogeneousGNN` と `CategoryHeteroGNN`、学習ループ、図 → `zenn-articles/images/hetero_loss_comparison.png`。 |
-| `compare_loss_visualization.py` | 基礎編第3回同条件: TwoLayerGCN vs MLP。要 **`../physics-gnn-surrogate-basic/spring_mass_chain_5.json`**。図 → `zenn-articles/images/loss_comparison_test.png`。 |
+| `compare_loss_visualization.py` | 基礎編第3回同条件: TwoLayerGCN vs MLP。要 **`../physics-gnn-surrogate-basic/data/spring_mass_chain_5.json`**。図 → `zenn-articles/images/loss_comparison_test.png`。 |
 | `article_figures_for_zenn.py` | 任意: `data/graph_from_catlab.json` 等から Zenn 用 PNG を `zenn-articles/images` へ。 |
 | `test_gpu.py` | CUDA 有無と大規模 `matmul` の計測。 |
 | `.gitignore` | 仮想環境・キャッシュ、**`*.json`**（例外 `!data/graph_from_catlab.json`）、生成 **PNG**。 |
@@ -310,7 +310,7 @@ python demo2_category_multiphysics.py
 python test_gpu.py
 ```
 
-**基礎編第3回同条件のベンチ（`compare_loss_visualization.py`）:** **[physics-gnn-surrogate-basic](https://github.com/kohmaruworks/physics-gnn-surrogate-basic)** を**同じ親ディレクトリ**に置き、**`../physics-gnn-surrogate-basic/spring_mass_chain_5.json`** があること。図は **`../zenn-articles/images`** があれば **`loss_comparison_test.png`** へ。
+**基礎編第3回同条件のベンチ（`compare_loss_visualization.py`）:** **[physics-gnn-surrogate-basic](https://github.com/kohmaruworks/physics-gnn-surrogate-basic)** を**同じ親ディレクトリ**に置き、**`../physics-gnn-surrogate-basic/data/spring_mass_chain_5.json`** があること。図は **`../zenn-articles/images`** があれば **`loss_comparison_test.png`** へ。
 
 ```bash
 python compare_loss_visualization.py

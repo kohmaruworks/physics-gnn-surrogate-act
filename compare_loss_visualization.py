@@ -2,7 +2,7 @@
 基礎編 第3回（train_spring_mass_gcn.py）と同じ学習条件のもと、
 2 層 GCN（グラフを利用）と平坦化 MLP（構造を無視）の学習損失を比較する。
 
-- データ: `physics-gnn-surrogate-basic/spring_mass_chain_5.json`（同一リポ内に無い場合は
+- データ: `physics-gnn-surrogate-basic/data/spring_mass_chain_5.json`（同一リポ内に無い場合は
   親ディレクトリの sibling リポジトリを探索）
 - 教師 y: Julia 側で ODE 積分した終端状態（第3回と同じ JSON）
 - モデル: GCN — in=2, hidden=16, out=2（TwoLayerGCN 相当）
@@ -126,6 +126,7 @@ class NaiveMLP(nn.Module):
 def resolve_spring_chain_json(repo: Path) -> Path:
     """第3回と同じ `spring_mass_chain_5.json` を解決。"""
     candidates = [
+        repo.parent / "physics-gnn-surrogate-basic" / "data" / "spring_mass_chain_5.json",
         repo.parent / "physics-gnn-surrogate-basic" / "spring_mass_chain_5.json",
         repo / "spring_mass_chain_5.json",
     ]
@@ -137,6 +138,7 @@ def resolve_spring_chain_json(repo: Path) -> Path:
         "次のいずれかに配置してください:\n"
         f"  - {candidates[0]}\n"
         f"  - {candidates[1]}\n"
+        f"  - {candidates[2]}\n"
         "基礎編リポで `spring_mass_chain_export.jl` から生成できます。"
     )
 
